@@ -8,6 +8,7 @@ import {
 import { start } from "./src/conversations";
 import { commands } from "./src/config";
 import mongoose from "mongoose";
+import { hydrate } from "@grammyjs/hydrate";
 
 dotenv.config();
 
@@ -17,7 +18,7 @@ const bot = new Bot<ConversationFlavor<Context>>(
 mongoose.connect(process.env.MONGO_URL as string);
 
 bot.use(conversations());
-bot.use(createConversation(start));
+bot.use(createConversation(start, { plugins: [hydrate()] }));
 
 commands.map((command) => {
   bot.command(command.command, command.action);

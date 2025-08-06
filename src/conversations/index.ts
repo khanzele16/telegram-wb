@@ -1,7 +1,14 @@
-import { InlineKeyboard, type Context } from "grammy";
-import { type Conversation } from "@grammyjs/conversations";
+import { InlineKeyboard } from "grammy";
+import {
+  getPromocode,
+  isActivePromocode,
+} from "../database/controllers/promocodes";
+import { MyConversation, MyConversationContext } from "../types";
 
-export const start = async (conversation: Conversation, ctx: Context) => {
+export const start = async (
+  conversation: MyConversation,
+  ctx: MyConversationContext
+) => {
   await ctx.reply(
     "🎉 Ты в боте закрытого канала\n<b>«Эльвира | WB CLUB | Альбина»</b>\n\nЧуть-чуть о нас, если ты ещё не в курсе, куда попал(а):\n\n👋 Привет! Мы — Эльвира и Альбина.\nУже более 5 лет работаем на маркетплейсах, глубоко погружаемся в аналитику и в рекламу , обучаем новичков, менеджеров и практиков.\n\n✅ За плечами:\n\n— 4 потока учеников\n— сотни консультаций\n— десятки сильных кейсов (https://t.me/wbclubotzivi)\n\n<b>📌 Зачем этот канал?</b>\n\nЧтобы ты больше не покупал(а) «воду» под видом обучения.\nЗдесь — максимум пользы:\n\n✅ Только рабочие инструменты\n✅ Только практика\n✅ Только то, что помогает зарабатывать\n\n🔐 Канал закрытый, информация — только для своих.\n👇 Жми старт, чтобы начать.\nДобро пожаловать в комьюнити сильных!",
     {
@@ -14,11 +21,17 @@ export const start = async (conversation: Conversation, ctx: Context) => {
     "callback_query",
   ]);
   if (callbackQuery?.data === "step:video") {
+    await ctx.api.answerCallbackQuery(callbackQuery.id, {
+      text: "Начало положено!",
+    });
     await video(conversation, ctx);
   }
 };
 
-const video = async (conversation: Conversation, ctx: Context) => {
+export const video = async (
+  conversation: MyConversation,
+  ctx: MyConversationContext
+) => {
   await ctx.replyWithVideo(
     "BAACAgIAAxkBAAMkaI409NfKm8Kn-S0i-IJuK3tYqdEAArh-AAJGMXFI4zid0un5t7w2BA",
     {
@@ -34,18 +47,32 @@ const video = async (conversation: Conversation, ctx: Context) => {
   );
   const { callbackQuery } = await conversation.waitFor("callback_query");
   if (callbackQuery.data === "step:buy") {
+    await ctx.api.answerCallbackQuery(callbackQuery.id, {
+      text: "🛒 Приобрести подписку",
+    });
     await buy(conversation, ctx);
   }
   if (callbackQuery.data === "step:promocode") {
+    await ctx.api.answerCallbackQuery(callbackQuery.id, {
+      text: "🔑 Ввести промокод",
+    });
     await promocode(conversation, ctx);
   }
 };
 
-const buy = async (conversation: Conversation, ctx: Context) => {
+const buy = async (
+  conversation: MyConversation,
+  ctx: MyConversationContext
+) => {
   await ctx.reply("Привет! Как ты?");
 };
 
-const promocode = async (conversation: Conversation, ctx: Context) => {
+const promocode = async (
+  conversation: MyConversation,
+  ctx: MyConversationContext
+) => {
+  const hasActive = await isActivePromocode(conversation, ctx);
+  if (hasActive) return;
   await ctx.reply("🔑 Введите промокод:", {
     reply_markup: new InlineKeyboard().text("◀️ Назад", "step:video"),
   });
@@ -54,7 +81,7 @@ const promocode = async (conversation: Conversation, ctx: Context) => {
     "callback_query",
   ]);
   if (message && message.text) {
-    await ctx.reply(`Промокод: ${message.text}`);
+    await getPromocode(conversation, ctx, message.text);
   } else if (callbackQuery?.data === "step:video") {
     await video(conversation, ctx);
   }

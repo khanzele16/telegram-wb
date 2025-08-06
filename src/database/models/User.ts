@@ -23,6 +23,11 @@ const User = new Schema(
         default: null,
       },
     ],
+    activePromocode: {
+      type: Schema.Types.ObjectId,
+      ref: "Promocode",
+      default: null,
+    },
   },
   { timestamps: true }
 );
