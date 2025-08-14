@@ -1,13 +1,20 @@
+import mongoose from "mongoose";
 import dotenv from "dotenv";
-import { Bot, GrammyError, HttpError, type Context } from "grammy";
+import {
+  Bot,
+  GrammyError,
+  HttpError,
+  NextFunction,
+  type Context,
+} from "grammy";
 import {
   ConversationFlavor,
+  ConversationMenuFlavor,
   conversations,
   createConversation,
 } from "@grammyjs/conversations";
 import { start } from "./src/conversations";
 import { commands } from "./src/config";
-import mongoose from "mongoose";
 import { hydrate } from "@grammyjs/hydrate";
 
 dotenv.config();
@@ -18,14 +25,18 @@ const bot = new Bot<ConversationFlavor<Context>>(
 mongoose.connect(process.env.MONGO_URL as string);
 
 bot.use(conversations());
+bot.command("start", async (ctx, next: NextFunction) => {
+  await ctx.conversation.exit("start");
+  return next();
+});
 bot.use(createConversation(start, { plugins: [hydrate()] }));
 
 commands.map((command) => {
   bot.command(command.command, command.action);
 });
 
-bot.on("message", (ctx) => {
-  ctx.reply(JSON.stringify(ctx.message));
+bot.on("message", async (ctx) => {
+  ctx.reply(JSON.stringify(ctx.from));
 });
 
 bot.catch((err) => {
