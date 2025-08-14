@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import cron from "node-cron";
 import dotenv from "dotenv";
 import {
   Bot,
@@ -30,6 +31,13 @@ bot.command("start", async (ctx, next: NextFunction) => {
   return next();
 });
 bot.use(createConversation(start, { plugins: [hydrate()] }));
+
+cron.schedule('* * * * *', () => {
+  const now = new Date().toLocaleString();
+  console.log(`[CRON] Задача сработала в ${now}`);
+});
+
+console.log('CRON-тест запущен. Ждём срабатывания...');
 
 commands.map((command) => {
   bot.command(command.command, command.action);
