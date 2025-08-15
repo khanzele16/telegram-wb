@@ -7,6 +7,12 @@ export interface ICommand extends BotCommand {
   action: (ctx: ConversationFlavor<Context>) => Promise<void>;
 }
 
+export interface KickJob {
+  chatId: number;
+  userId: number;
+  username?: string;
+}
+
 export type MyContext = ConversationFlavor<Context>;
 export type MyConversationContext = HydrateFlavor<Context>;
 export type MyConversation = Conversation<MyContext, MyConversationContext>;

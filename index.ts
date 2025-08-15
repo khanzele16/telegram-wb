@@ -10,13 +10,15 @@ import {
 } from "grammy";
 import {
   ConversationFlavor,
-  ConversationMenuFlavor,
   conversations,
   createConversation,
 } from "@grammyjs/conversations";
 import { start } from "./src/conversations";
 import { commands } from "./src/config";
 import { hydrate } from "@grammyjs/hydrate";
+import Redis from "ioredis";
+import { Job, Worker, Queue } from "bullmq";
+import { KickJob } from "./src/types";
 
 dotenv.config();
 
@@ -32,19 +34,46 @@ bot.command("start", async (ctx, next: NextFunction) => {
 });
 bot.use(createConversation(start, { plugins: [hydrate()] }));
 
-cron.schedule('* * * * *', () => {
-  const now = new Date().toLocaleString();
-  console.log(`[CRON] Задача сработала в ${now}`);
-});
-
-console.log('CRON-тест запущен. Ждём срабатывания...');
-
 commands.map((command) => {
   bot.command(command.command, command.action);
 });
 
-bot.on("message", async (ctx) => {
-  ctx.reply(JSON.stringify(ctx.from));
+const connection = new Redis({ maxRetriesPerRequest: null });
+
+new Worker(
+  "kickUsers",
+  async (job: Job<KickJob>) => {
+    const { chatId, userId, username } = job.data;
+    try {
+      await bot.api.banChatMember(chatId, userId);
+      await bot.api.unbanChatMember(chatId, userId);
+      console.log(`[WORKER] Кикнут: ${username || userId}`);
+    } catch (err) {
+      console.error(`[WORKER] Ошибка кика ${username || userId}:`, err);
+    }
+  },
+  {
+    connection,
+    concurrency: 1,
+  }
+);
+
+// создаём очередь
+const kickQueue = new Queue<KickJob>("kickUsers", { connection });
+
+// --- тестовая задача ---
+(async () => {
+  await kickQueue.add("kick", {
+    chatId: -1001234567890, // ← твой ID группы
+    userId: 123456789, // ← твой Telegram ID
+    username: "TestUser",
+  });
+  console.log("[TEST] Джоба на кик добавлена");
+})();
+
+cron.schedule("* * * * *", () => {
+  const now = new Date().toLocaleString();
+  console.log(`[CRON] Задача сработала в ${now}`);
 });
 
 bot.catch((err) => {
@@ -60,4 +89,5 @@ bot.catch((err) => {
   }
 });
 
+console.log("Bot started with cron");
 bot.start();
