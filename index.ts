@@ -64,9 +64,9 @@ const kickQueue = new Queue<KickJob>("kickUsers", { connection });
 // --- тестовая задача ---
 (async () => {
   await kickQueue.add("kick", {
-    chatId: -1001234567890, // ← твой ID группы
-    userId: 123456789, // ← твой Telegram ID
-    username: "TestUser",
+    chatId: -1002890988755, // ← твой ID группы
+    userId: 7593630831, // ← твой Telegram ID
+    username: "avarenokk",
   });
   console.log("[TEST] Джоба на кик добавлена");
 })();
@@ -75,6 +75,10 @@ cron.schedule("* * * * *", () => {
   const now = new Date().toLocaleString();
   console.log(`[CRON] Задача сработала в ${now}`);
 });
+
+bot.on("message", (ctx) => {
+ctx.reply(JSON.stringify(ctx))
+})
 
 bot.catch((err) => {
   const ctx = err.ctx;
