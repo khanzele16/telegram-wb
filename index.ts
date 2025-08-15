@@ -19,6 +19,7 @@ import { hydrate } from "@grammyjs/hydrate";
 import Redis from "ioredis";
 import { Job, Worker, Queue } from "bullmq";
 import { KickJob } from "./src/types";
+import User from "./src/database/models/User";
 
 dotenv.config();
 
@@ -43,13 +44,13 @@ const connection = new Redis({ maxRetriesPerRequest: null });
 new Worker(
   "kickUsers",
   async (job: Job<KickJob>) => {
-    const { chatId, userId, username } = job.data;
+    const { chatId, userId } = job.data;
     try {
       await bot.api.banChatMember(chatId, userId);
       await bot.api.unbanChatMember(chatId, userId);
-      console.log(`[WORKER] Кикнут: ${username || userId}`);
+      console.log(`[WORKER] Кикнут userId: ${userId}`);
     } catch (err) {
-      console.error(`[WORKER] Ошибка кика ${username || userId}:`, err);
+      console.error(`[WORKER] Ошибка кика userId: ${userId}:`, err);
     }
   },
   {
@@ -58,27 +59,44 @@ new Worker(
   }
 );
 
-// создаём очередь
 const kickQueue = new Queue<KickJob>("kickUsers", { connection });
 
-// --- тестовая задача ---
-(async () => {
-  await kickQueue.add("kick", {
-    chatId: -1002890988755, // ← твой ID группы
-    userId: 7593630831, // ← твой Telegram ID
-    username: "avarenokk",
-  });
-  console.log("[TEST] Джоба на кик добавлена");
-})();
+cron.schedule("* * * * *", async () => {
+  console.log("[CRON] Проверка подписок началась");
+  try {
+    const now = new Date();
+    const expiredUsers = await User.find({
+      dateOfSubscription: {
+        $lte: new Date(now.getTime() - 24 * 60 * 60 * 1000),
+      },
+      subscription: true,
+    });
 
-cron.schedule("* * * * *", () => {
-  const now = new Date().toLocaleString();
-  console.log(`[CRON] Задача сработала в ${now}`);
+    for (const user of expiredUsers) {
+      await kickQueue.add("kick", {
+        chatId: Number(process.env.CHANNEL_ID),
+        userId: user.telegramId,
+        username: user.username ?? undefined,
+      });
+
+      user.subscription = false;
+      user.dateOfSubscription = null as any;
+      await user.save();
+
+      console.log(
+        `[CRON] Подписка деактивирована для telegramId: ${user.telegramId}`
+      );
+    }
+
+    console.log("[CRON] Проверка подписок завершена");
+  } catch (err) {
+    console.error("[CRON] Ошибка при проверке подписок:", err);
+  }
 });
 
 bot.on("message", (ctx) => {
-ctx.reply(JSON.stringify(ctx))
-})
+  ctx.reply(JSON.stringify(ctx));
+});
 
 bot.catch((err) => {
   const ctx = err.ctx;
@@ -93,5 +111,4 @@ bot.catch((err) => {
   }
 });
 
-console.log("Bot started with cron");
 bot.start();
